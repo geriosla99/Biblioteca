@@ -1,221 +1,189 @@
-import { Boton, Container } from './Home';
-import React, { useState } from "react";
+import React, { useState, useEffect } from 'react';
 
-const Home = () => {
-  const [action, setAction] = useState(""); // Estado para controlar qué acción está activa
-  const [bookData, setBookData] = useState(null); // Datos del libro que se buscan
-  const [formData, setFormData] = useState({}); // Estado dinámico para campos del formulario
-  const [library, setLibrary] = useState([]); // Almacena todos los libros
-  const [loanRecords, setLoanRecords] = useState([]); // Almacena los préstamos
+const BibliotecaApp = () => {
+  const [library, setLibrary] = useState([]);
+  const [loanRecords, setLoanRecords] = useState([]);
+  const [formData, setFormData] = useState({});
+  const [bookData, setBookData] = useState({});
 
-  // Función para manejar los cambios dinámicos en los inputs
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  // Cargar libros disponibles al iniciar
+  useEffect(() => {
+    fetch('http://localhost:5000/libros_disponibles')
+      .then((res) => res.json())
+      .then((data) => setLibrary(data))
+      .catch((error) => console.error('Error:', error));
+  }, []);
 
-  // Función para manejar la búsqueda del libro en la biblioteca
-  const searchBook = () => {
-    const foundBook = library.find(
-      (book) => book.titulo.toLowerCase() === formData.searchBook.toLowerCase()
-    );
-    if (foundBook) {
-      setBookData(foundBook);
-    } else {
-      alert("El libro no se encontró.");
-      setBookData(null);
-    }
+  // Función para registrar un usuario
+  const registerUser = async () => {
+    const response = await fetch('http://localhost:5000/registrar_usuario', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+    const result = await response.json();
+    alert(result.mensaje);
+    setFormData({}); // Limpiar formulario
   };
 
   // Función para agregar un libro a la biblioteca
-  const addBook = () => {
-    const newBook = { ...formData, prestamos: [], disponibilidad: true };
-    setLibrary([...library, newBook]);
-    alert(`Libro "${formData.titulo}" agregado correctamente.`);
-    setFormData({});
+  const addBook = async () => {
+    const response = await fetch('http://localhost:5000/crear_libro', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+    const result = await response.json();
+    alert(result.mensaje);
+    setLibrary([...library, formData]); // Actualizar localmente
+    setFormData({}); // Limpiar formulario
   };
 
-  // Función para prestar un libro
-  const lendBook = () => {
-    if (bookData && bookData.disponibilidad) {
-      const newLoan = {
-        id_usuario: formData.id_usuario,
-        nombre: formData.nombre,
-        email: formData.email,
-        id_libro: bookData.id_libro,
-        fecha_prestamo: new Date().toLocaleString(),
-        id_prestamo: `prestamo${loanRecords.length + 1}`,
-      };
+  // Función para registrar un préstamo
+  const lendBook = async () => {
+    const newLoan = {
+      id_usuario: formData.id_usuario,
+      nombre: formData.nombre,
+      email: formData.email,
+      id_libro: bookData.id_libro,
+      fecha_prestamo: new Date().toLocaleString(),
+      id_prestamo: `prestamo${loanRecords.length + 1}`,
+    };
 
-      // Actualizar libro con préstamo
-      const updatedLibrary = library.map((book) =>
-        book.id_libro === bookData.id_libro
-          ? { ...book, disponibilidad: false, prestamos: [...book.prestamos, newLoan.id_prestamo] }
-          : book
-      );
+    const response = await fetch('http://localhost:5000/registrar_prestamo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newLoan),
+    });
 
-      // Actualizar registros de préstamo
-      setLoanRecords([...loanRecords, newLoan]);
-      setLibrary(updatedLibrary);
-      alert(`El libro "${bookData.titulo}" ha sido prestado a ${formData.nombre}.`);
-      setFormData({});
-    } else {
-      alert("El libro no está disponible para préstamo.");
-    }
+    const result = await response.json();
+    alert(result.mensaje);
+    setLoanRecords([...loanRecords, newLoan]); // Actualizar localmente
+    setFormData({}); // Limpiar formulario
   };
 
-  // Función para devolver un libro
-  const returnBook = () => {
-    if (bookData && !bookData.disponibilidad) {
-      const updatedLibrary = library.map((book) =>
-        book.id_libro === bookData.id_libro
-          ? { ...book, disponibilidad: true }
-          : book
-      );
-      setLibrary(updatedLibrary);
-      alert(`El libro "${bookData.titulo}" ha sido devuelto.`);
-    } else {
-      alert("El libro no está prestado.");
-    }
-    setFormData({});
+  // Función para modificar un usuario
+  const updateUser = async (id_usuario) => {
+    const response = await fetch(`http://localhost:5000/modificar_usuario/${id_usuario}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+    const result = await response.json();
+    alert(result.mensaje);
+    setFormData({}); // Limpiar formulario
   };
 
-  // Generar dinámicamente los inputs según la acción seleccionada
-  const renderFields = () => {
-    switch (action) {
-      case "buscar":
-        return (
-          <>
-            <input
-              type="text"
-              name="searchBook"
-              value={formData.searchBook || ""}
-              onChange={handleInputChange}
-              placeholder="Nombre del libro"
-            />
-            <Boton onClick={searchBook}>Buscar</Boton>
-            {bookData && (
-              <div>
-                <p><strong>Autor:</strong> {bookData.autor}</p>
-                <p><strong>Disponibilidad:</strong> {bookData.disponibilidad.toString()}</p>
-                <p><strong>Editorial:</strong> {bookData.editorial}</p>
-                <p><strong>ID Libro:</strong> {bookData.id_libro}</p>
-                <p><strong>Título:</strong> {bookData.titulo}</p>
-                <p><strong>Préstamos:</strong> {bookData.prestamos.join(", ")}</p>
-              </div>
-            )}
-          </>
-        );
-      case "agregar":
-        return (
-          <>
-            <input
-              type="text"
-              name="autor"
-              value={formData.autor || ""}
-              onChange={handleInputChange}
-              placeholder="Autor"
-            />
-            <input
-              type="text"
-              name="editorial"
-              value={formData.editorial || ""}
-              onChange={handleInputChange}
-              placeholder="Editorial"
-            />
-            <input
-              type="text"
-              name="id_libro"
-              value={formData.id_libro || ""}
-              onChange={handleInputChange}
-              placeholder="ID del libro"
-            />
-            <input
-              type="text"
-              name="titulo"
-              value={formData.titulo || ""}
-              onChange={handleInputChange}
-              placeholder="Título"
-            />
-            <Boton onClick={addBook}>Agregar Libro</Boton>
-          </>
-        );
-      case "prestar":
-        return (
-          <>
-            <input
-              type="text"
-              name="searchBook"
-              value={formData.searchBook || ""}
-              onChange={handleInputChange}
-              placeholder="Nombre del libro"
-            />
-            <Boton onClick={searchBook}>Buscar</Boton>
-            {bookData && bookData.disponibilidad && (
-              <>
-                <input
-                  type="text"
-                  name="id_usuario"
-                  value={formData.id_usuario || ""}
-                  onChange={handleInputChange}
-                  placeholder="ID de usuario"
-                />
-                <input
-                  type="text"
-                  name="nombre"
-                  value={formData.nombre || ""}
-                  onChange={handleInputChange}
-                  placeholder="Nombre del usuario"
-                />
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email || ""}
-                  onChange={handleInputChange}
-                  placeholder="Correo electrónico"
-                />
-                <Boton onClick={lendBook}>Confirmar Préstamo</Boton>
-              </>
-            )}
-          </>
-        );
-      case "devolucion":
-        return (
-          <>
-            <input
-              type="text"
-              name="searchBook"
-              value={formData.searchBook || ""}
-              onChange={handleInputChange}
-              placeholder="Nombre del libro"
-            />
-            <Boton onClick={searchBook}>Buscar</Boton>
-            {bookData && !bookData.disponibilidad && (
-              <Boton onClick={returnBook}>Confirmar Devolución</Boton>
-            )}
-          </>
-        );
-      default:
-        return <p>Selecciona una acción para continuar.</p>;
-    }
+  // Función para eliminar un usuario
+  const deleteUser = async (id_usuario) => {
+    const response = await fetch(`http://localhost:5000/eliminar_usuario/${id_usuario}`, {
+      method: 'DELETE',
+    });
+    const result = await response.json();
+    alert(result.mensaje);
   };
 
   return (
-    <Container>
-      <h1>Bienvenido a la Biblioteca</h1>
-      <p>Gestión de libros, usuarios y préstamos en un solo lugar.</p>
+    <div>
+      <h1>Biblioteca</h1>
+
+      {/* Formulario para registrar usuario */}
       <div>
-        <Boton onClick={() => setAction("buscar")}>Buscar Libro</Boton>
-        <Boton onClick={() => setAction("agregar")}>Agregar Libro</Boton>
-        <Boton onClick={() => setAction("prestar")}>Prestar Libro</Boton>
-        <Boton onClick={() => setAction("devolucion")}>Devolución de Libro</Boton>
+        <h2>Registrar Usuario</h2>
+        <input
+          type="text"
+          placeholder="ID Usuario"
+          value={formData.id_usuario || ''}
+          onChange={(e) => setFormData({ ...formData, id_usuario: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="Nombre"
+          value={formData.nombre || ''}
+          onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+        />
+        <input
+          type="password"
+          placeholder="Contraseña"
+          value={formData.contraseña || ''}
+          onChange={(e) => setFormData({ ...formData, contraseña: e.target.value })}
+        />
+        <input
+          type="email"
+          placeholder="Email"
+          value={formData.email || ''}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+        />
+        <button onClick={registerUser}>Registrar Usuario</button>
       </div>
-      <div>{renderFields()}</div>
-    </Container>
+
+      {/* Formulario para agregar libro */}
+      <div>
+        <h2>Agregar Libro</h2>
+        <input
+          type="text"
+          placeholder="ID Libro"
+          value={formData.id_libro || ''}
+          onChange={(e) => setFormData({ ...formData, id_libro: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="Autor"
+          value={formData.autor || ''}
+          onChange={(e) => setFormData({ ...formData, autor: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="Título"
+          value={formData.titulo || ''}
+          onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="Editorial"
+          value={formData.editorial || ''}
+          onChange={(e) => setFormData({ ...formData, editorial: e.target.value })}
+        />
+        <input
+          type="checkbox"
+          checked={formData.disponible || false}
+          onChange={(e) => setFormData({ ...formData, disponible: e.target.checked })}
+        />
+        Disponible
+        <button onClick={addBook}>Agregar Libro</button>
+      </div>
+
+      {/* Formulario para registrar préstamo */}
+      <div>
+        <h2>Registrar Préstamo</h2>
+        <input
+          type="text"
+          placeholder="ID Usuario"
+          value={formData.id_usuario || ''}
+          onChange={(e) => setFormData({ ...formData, id_usuario: e.target.value })}
+        />
+        <input
+          type="text"
+          placeholder="ID Libro"
+          value={bookData.id_libro || ''}
+          onChange={(e) => setBookData({ ...bookData, id_libro: e.target.value })}
+        />
+        <button onClick={lendBook}>Registrar Préstamo</button>
+      </div>
+
+      {/* Mostrar libros disponibles */}
+      <div>
+        <h2>Libros Disponibles</h2>
+        <ul>
+          {library.map((libro, index) => (
+            <li key={index}>
+              {libro.Título} - {libro.Autor} ({libro.Editorial}) {libro.Disponible ? 'Disponible' : 'No Disponible'}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 };
 
-export default Home;
+export default BibliotecaApp;
